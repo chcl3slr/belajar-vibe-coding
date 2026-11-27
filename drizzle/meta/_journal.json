@@ -15,6 +15,13 @@
       "when": 1795816698317,
       "tag": "0001_famous_nightcrawler",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1795817777574,
+      "tag": "0002_far_husk",
+      "breakpoints": true
     }
   ]
 }

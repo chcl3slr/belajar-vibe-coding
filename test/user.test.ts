@@ -90,3 +90,82 @@ describe("User Registration Endpoint (POST /api/users)", () => {
     expect(isMatch).toBe(true);
   });
 });
+
+describe("User Login Endpoint (POST /api/users/login)", () => {
+  it("Validates required fields in request body", async () => {
+    const response = await app.handle(
+      new Request("http://localhost:3000/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "invalid-email",
+          password: "",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(422);
+  });
+
+  it("Logs in successfully with valid credentials and returns session token", async () => {
+    const dummyToken = "550e8400-e29b-41d4-a716-446655440000";
+    const spy = spyOn(userServices, "loginUser").mockResolvedValue({
+      token: dummyToken,
+    });
+
+    try {
+      const response = await app.handle(
+        new Request("http://localhost:3000/api/users/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: "ben@localhost",
+            password: "rahasia",
+          }),
+        })
+      );
+
+      expect(response.status).toBe(200);
+      const json = (await response.json()) as Record<string, any>;
+      expect(json.data).toBe(dummyToken);
+      expect(spy).toHaveBeenCalledWith({
+        email: "ben@localhost",
+        password: "rahasia",
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("Returns 401 with 'Email atau password salah' on invalid credentials", async () => {
+    const spy = spyOn(userServices, "loginUser").mockRejectedValue(
+      new userServices.InvalidCredentialsError("Email atau password salah")
+    );
+
+    try {
+      const response = await app.handle(
+        new Request("http://localhost:3000/api/users/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: "ben@localhost",
+            password: "wrong-password",
+          }),
+        })
+      );
+
+      expect(response.status).toBe(401);
+      const json = (await response.json()) as Record<string, any>;
+      expect(json.error).toBe("Email atau password salah");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("Generates a valid UUID token format", () => {
+    const token = crypto.randomUUID();
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    expect(uuidRegex.test(token)).toBe(true);
+  });
+});
