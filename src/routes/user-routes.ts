@@ -3,10 +3,19 @@ import {
   getCurrentUser,
   InvalidCredentialsError,
   loginUser,
+  logoutUser,
   registerUser,
   UnauthorizedError,
   UserAlreadyExistsError,
 } from "../services/user-services";
+
+export const extractBearerToken = (authHeader?: string | null): string | null => {
+  if (!authHeader) return null;
+  const trimmed = authHeader.trim();
+  if (!trimmed.toLowerCase().startsWith("bearer ")) return null;
+  const token = trimmed.slice(7).trim();
+  return token.length > 0 ? token : null;
+};
 
 export const userRoutes = new Elysia()
   .post(
@@ -71,15 +80,7 @@ export const userRoutes = new Elysia()
     }
   )
   .get("/api/users/current", async ({ headers, set }) => {
-    const authHeader = headers.authorization || headers["authorization"];
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      set.status = 401;
-      return {
-        error: "Unauthorized",
-      };
-    }
-
-    const token = authHeader.slice(7).trim();
+    const token = extractBearerToken(headers.authorization);
     if (!token) {
       set.status = 401;
       return {
@@ -92,6 +93,31 @@ export const userRoutes = new Elysia()
       set.status = 200;
       return {
         data: user,
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        set.status = 401;
+        return {
+          error: error.message,
+        };
+      }
+      throw error;
+    }
+  })
+  .delete("/api/users/logout", async ({ headers, set }) => {
+    const token = extractBearerToken(headers.authorization);
+    if (!token) {
+      set.status = 401;
+      return {
+        error: "Unauthorized",
+      };
+    }
+
+    try {
+      await logoutUser(token);
+      set.status = 200;
+      return {
+        data: "OK",
       };
     } catch (error) {
       if (error instanceof UnauthorizedError) {
