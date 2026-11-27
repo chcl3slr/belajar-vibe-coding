@@ -169,3 +169,99 @@ describe("User Login Endpoint (POST /api/users/login)", () => {
     expect(uuidRegex.test(token)).toBe(true);
   });
 });
+
+describe("Current User Endpoint (GET /api/users/current)", () => {
+  it("Returns 401 when Authorization header is missing", async () => {
+    const response = await app.handle(
+      new Request("http://localhost:3000/api/users/current", {
+        method: "GET",
+      })
+    );
+
+    expect(response.status).toBe(401);
+    const json = (await response.json()) as Record<string, any>;
+    expect(json.error).toBe("Unauthorized");
+  });
+
+  it("Returns 401 when Authorization header format is not Bearer", async () => {
+    const response = await app.handle(
+      new Request("http://localhost:3000/api/users/current", {
+        method: "GET",
+        headers: {
+          Authorization: "Basic dXNlcjpwYXNz",
+        },
+      })
+    );
+
+    expect(response.status).toBe(401);
+    const json = (await response.json()) as Record<string, any>;
+    expect(json.error).toBe("Unauthorized");
+  });
+
+  it("Returns 401 when Bearer token is empty", async () => {
+    const response = await app.handle(
+      new Request("http://localhost:3000/api/users/current", {
+        method: "GET",
+        headers: {
+          Authorization: "Bearer    ",
+        },
+      })
+    );
+
+    expect(response.status).toBe(401);
+    const json = (await response.json()) as Record<string, any>;
+    expect(json.error).toBe("Unauthorized");
+  });
+
+  it("Returns 401 when session token is invalid or not found", async () => {
+    const spy = spyOn(userServices, "getCurrentUser").mockRejectedValue(
+      new userServices.UnauthorizedError("Unauthorized")
+    );
+
+    try {
+      const response = await app.handle(
+        new Request("http://localhost:3000/api/users/current", {
+          method: "GET",
+          headers: {
+            Authorization: "Bearer invalid-token",
+          },
+        })
+      );
+
+      expect(response.status).toBe(401);
+      const json = (await response.json()) as Record<string, any>;
+      expect(json.error).toBe("Unauthorized");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("Returns 200 with user profile on valid session token", async () => {
+    const mockUser = {
+      id: 1,
+      name: "Ben",
+      email: "ben@localhost",
+    };
+    const validToken = "550e8400-e29b-41d4-a716-446655440000";
+    const spy = spyOn(userServices, "getCurrentUser").mockResolvedValue(mockUser);
+
+    try {
+      const response = await app.handle(
+        new Request("http://localhost:3000/api/users/current", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${validToken}`,
+          },
+        })
+      );
+
+      expect(response.status).toBe(200);
+      const json = (await response.json()) as Record<string, any>;
+      expect(json.data).toEqual(mockUser);
+      expect(json.data.password).toBeUndefined();
+      expect(spy).toHaveBeenCalledWith(validToken);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
