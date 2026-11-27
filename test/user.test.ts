@@ -1,5 +1,7 @@
 import { describe, expect, it, spyOn } from "bun:test";
 import { app } from "../src/index";
+import { db } from "../src/db";
+import { extractBearerToken } from "../src/routes/user-routes";
 import * as userServices from "../src/services/user-services";
 
 describe("User Registration Endpoint (POST /api/users)", () => {
@@ -167,6 +169,35 @@ describe("User Login Endpoint (POST /api/users/login)", () => {
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     expect(uuidRegex.test(token)).toBe(true);
+  });
+});
+
+describe("extractBearerToken Helper", () => {
+  it("Extracts token from standard Bearer header", () => {
+    expect(extractBearerToken("Bearer my-token-123")).toBe("my-token-123");
+  });
+
+  it("Extracts token case-insensitively (bearer / BEARER)", () => {
+    expect(extractBearerToken("bearer my-token-abc")).toBe("my-token-abc");
+    expect(extractBearerToken("BEARER my-token-xyz")).toBe("my-token-xyz");
+  });
+
+  it("Returns null for missing, null, or undefined headers", () => {
+    expect(extractBearerToken(undefined)).toBeNull();
+    expect(extractBearerToken(null)).toBeNull();
+    expect(extractBearerToken("")).toBeNull();
+    expect(extractBearerToken("   ")).toBeNull();
+  });
+
+  it("Returns null for non-Bearer schemes", () => {
+    expect(extractBearerToken("Basic dXNlcjpwYXNz")).toBeNull();
+    expect(extractBearerToken("Token 12345")).toBeNull();
+  });
+
+  it("Returns null for Bearer scheme with empty or whitespace token", () => {
+    expect(extractBearerToken("Bearer")).toBeNull();
+    expect(extractBearerToken("Bearer ")).toBeNull();
+    expect(extractBearerToken("Bearer    ")).toBeNull();
   });
 });
 
@@ -352,6 +383,45 @@ describe("Logout User Endpoint (DELETE /api/users/logout)", () => {
       expect(spy).toHaveBeenCalledWith(validToken);
     } finally {
       spy.mockRestore();
+    }
+  });
+});
+
+describe("logoutUser Service Logic", () => {
+  it("Throws UnauthorizedError for empty or whitespace-only token", async () => {
+    await expect(userServices.logoutUser("")).rejects.toThrow(
+      userServices.UnauthorizedError
+    );
+    await expect(userServices.logoutUser("   ")).rejects.toThrow(
+      userServices.UnauthorizedError
+    );
+  });
+
+  it("Throws UnauthorizedError when token does not exist (affectedRows === 0)", async () => {
+    const deleteSpy = spyOn(db, "delete").mockReturnValue({
+      where: () => Promise.resolve([{ affectedRows: 0 }]),
+    } as any);
+
+    try {
+      await expect(
+        userServices.logoutUser("nonexistent-token")
+      ).rejects.toThrow(userServices.UnauthorizedError);
+    } finally {
+      deleteSpy.mockRestore();
+    }
+  });
+
+  it("Succeeds when token exists and is deleted (affectedRows === 1)", async () => {
+    const deleteSpy = spyOn(db, "delete").mockReturnValue({
+      where: () => Promise.resolve([{ affectedRows: 1 }]),
+    } as any);
+
+    try {
+      await expect(
+        userServices.logoutUser("valid-active-token")
+      ).resolves.toBeUndefined();
+    } finally {
+      deleteSpy.mockRestore();
     }
   });
 });

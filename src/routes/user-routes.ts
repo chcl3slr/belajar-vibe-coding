@@ -9,6 +9,14 @@ import {
   UserAlreadyExistsError,
 } from "../services/user-services";
 
+export const extractBearerToken = (authHeader?: string | null): string | null => {
+  if (!authHeader) return null;
+  const trimmed = authHeader.trim();
+  if (!trimmed.toLowerCase().startsWith("bearer ")) return null;
+  const token = trimmed.slice(7).trim();
+  return token.length > 0 ? token : null;
+};
+
 export const userRoutes = new Elysia()
   .post(
     "/api/users",
@@ -72,15 +80,7 @@ export const userRoutes = new Elysia()
     }
   )
   .get("/api/users/current", async ({ headers, set }) => {
-    const authHeader = headers.authorization || headers["authorization"];
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      set.status = 401;
-      return {
-        error: "Unauthorized",
-      };
-    }
-
-    const token = authHeader.slice(7).trim();
+    const token = extractBearerToken(headers.authorization);
     if (!token) {
       set.status = 401;
       return {
@@ -105,15 +105,7 @@ export const userRoutes = new Elysia()
     }
   })
   .delete("/api/users/logout", async ({ headers, set }) => {
-    const authHeader = headers.authorization || headers["authorization"];
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      set.status = 401;
-      return {
-        error: "Unauthorized",
-      };
-    }
-
-    const token = authHeader.slice(7).trim();
+    const token = extractBearerToken(headers.authorization);
     if (!token) {
       set.status = 401;
       return {

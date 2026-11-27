@@ -128,15 +128,11 @@ export const logoutUser = async (token: string): Promise<void> => {
     throw new UnauthorizedError();
   }
 
-  const [existingSession] = await db
-    .select({ id: sessions.id })
-    .from(sessions)
-    .where(eq(sessions.token, trimmedToken))
-    .limit(1);
+  const [result] = await db
+    .delete(sessions)
+    .where(eq(sessions.token, trimmedToken));
 
-  if (!existingSession) {
+  if (!result || (result as any).affectedRows === 0) {
     throw new UnauthorizedError();
   }
-
-  await db.delete(sessions).where(eq(sessions.token, trimmedToken));
 };
