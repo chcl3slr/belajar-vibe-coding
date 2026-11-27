@@ -1,9 +1,11 @@
 import { Elysia } from "elysia";
 import { poolConnection } from "./db";
+import { userRoutes } from "./routes/user-routes";
 
 const port = Number(process.env.PORT) || 3000;
 
 export const app = new Elysia()
+  .use(userRoutes)
   .get("/", () => ({
     name: "belajar-vibe-coding API",
     status: "running",
