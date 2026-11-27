@@ -121,3 +121,22 @@ export const getCurrentUser = async (token: string): Promise<CurrentUser> => {
 
   return result;
 };
+
+export const logoutUser = async (token: string): Promise<void> => {
+  const trimmedToken = token ? token.trim() : "";
+  if (!trimmedToken) {
+    throw new UnauthorizedError();
+  }
+
+  const [existingSession] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(eq(sessions.token, trimmedToken))
+    .limit(1);
+
+  if (!existingSession) {
+    throw new UnauthorizedError();
+  }
+
+  await db.delete(sessions).where(eq(sessions.token, trimmedToken));
+};

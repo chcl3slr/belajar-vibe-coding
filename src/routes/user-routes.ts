@@ -3,6 +3,7 @@ import {
   getCurrentUser,
   InvalidCredentialsError,
   loginUser,
+  logoutUser,
   registerUser,
   UnauthorizedError,
   UserAlreadyExistsError,
@@ -92,6 +93,39 @@ export const userRoutes = new Elysia()
       set.status = 200;
       return {
         data: user,
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        set.status = 401;
+        return {
+          error: error.message,
+        };
+      }
+      throw error;
+    }
+  })
+  .delete("/api/users/logout", async ({ headers, set }) => {
+    const authHeader = headers.authorization || headers["authorization"];
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      set.status = 401;
+      return {
+        error: "Unauthorized",
+      };
+    }
+
+    const token = authHeader.slice(7).trim();
+    if (!token) {
+      set.status = 401;
+      return {
+        error: "Unauthorized",
+      };
+    }
+
+    try {
+      await logoutUser(token);
+      set.status = 200;
+      return {
+        data: "OK",
       };
     } catch (error) {
       if (error instanceof UnauthorizedError) {
