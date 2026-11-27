@@ -1,8 +1,10 @@
 import { Elysia, t } from "elysia";
 import {
+  getCurrentUser,
   InvalidCredentialsError,
   loginUser,
   registerUser,
+  UnauthorizedError,
   UserAlreadyExistsError,
 } from "../services/user-services";
 
@@ -67,4 +69,37 @@ export const userRoutes = new Elysia()
         password: t.String({ minLength: 1 }),
       }),
     }
-  );
+  )
+  .get("/api/users/current", async ({ headers, set }) => {
+    const authHeader = headers.authorization || headers["authorization"];
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      set.status = 401;
+      return {
+        error: "Unauthorized",
+      };
+    }
+
+    const token = authHeader.slice(7).trim();
+    if (!token) {
+      set.status = 401;
+      return {
+        error: "Unauthorized",
+      };
+    }
+
+    try {
+      const user = await getCurrentUser(token);
+      set.status = 200;
+      return {
+        data: user,
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        set.status = 401;
+        return {
+          error: error.message,
+        };
+      }
+      throw error;
+    }
+  });
