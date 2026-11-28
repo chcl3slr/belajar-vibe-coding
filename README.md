@@ -1,6 +1,6 @@
 # Belajar Vibe Coding — Backend API
 
-Backend REST API untuk manajemen user dan autentikasi berbasis session token (registrasi, login, profil user aktif, dan logout) serta pemantauan status layanan (*health check*). Proyek ini dibangun menggunakan **Bun**, **ElysiaJS**, **Drizzle ORM**, dan **MySQL** dengan pemisahan layer yang rapi antara routing, business logic, dan akses database.
+Backend REST API untuk manajemen user dan autentikasi berbasis session token (registrasi, login, profil user aktif, dan logout), pemantauan status layanan (*health check*), serta dokumentasi interaktif menggunakan **Swagger UI (@elysia/openapi)**. Proyek ini dibangun menggunakan **Bun**, **ElysiaJS**, **Drizzle ORM**, dan **MySQL** dengan pemisahan layer yang rapi antara routing, business logic, dan akses database.
 
 ---
 
@@ -9,6 +9,7 @@ Backend REST API untuk manajemen user dan autentikasi berbasis session token (re
 - [Library yang Digunakan](#library-yang-digunakan)
 - [Arsitektur & Struktur Project](#arsitektur--struktur-project)
 - [Schema Database](#schema-database)
+- [Dokumentasi API Interaktif (Swagger UI)](#dokumentasi-api-interaktif-swagger-ui)
 - [API yang Tersedia](#api-yang-tersedia)
 - [Cara Setup Project](#cara-setup-project)
 - [Cara Menjalankan Aplikasi](#cara-menjalankan-aplikasi)
@@ -20,7 +21,9 @@ Backend REST API untuk manajemen user dan autentikasi berbasis session token (re
 - **Runtime, Package Manager & Test Runner:** [Bun](https://bun.sh/)
 - **Bahasa Pemrograman:** TypeScript (`strict: true`)
 - **Web Framework:** [ElysiaJS](https://elysiajs.com/)
+- **API Documentation:** [@elysia/openapi](https://elysiajs.com/plugins/openapi.html) (Swagger UI)
 - **ORM & Schema Migration:** [Drizzle ORM](https://orm.drizzle.team/) & Drizzle Kit
+- **Database Driver:** `mysql2`
 - **Database:** MySQL
 
 ---
@@ -31,6 +34,7 @@ Backend REST API untuk manajemen user dan autentikasi berbasis session token (re
 | Package | Versi | Kegunaan |
 | --- | --- | --- |
 | `elysia` | `^1.4.32` | Web framework, HTTP routing, validasi schema (`t` / TypeBox), dan global error handling |
+| `@elysia/openapi` | `^1.4.17` | Plugin OpenAPI untuk dokumentasi Swagger UI (`/swagger`) dan spesifikasi JSON (`/swagger/json`) |
 | `drizzle-orm` | `^0.45.4` | ORM type-safe untuk definisi skema tabel dan query builder MySQL |
 | `mysql2` | `^3.24.6` | Driver MySQL berbasis connection pool (`mysql2/promise`) yang digunakan oleh Drizzle |
 | `dotenv` | `^18.0.10` | Memuat konfigurasi environment variable dari file `.env` |
@@ -54,10 +58,10 @@ Backend REST API untuk manajemen user dan autentikasi berbasis session token (re
 Aplikasi ini menerapkan arsitektur berlapis (*layered architecture*) untuk memisahkan tanggung jawab HTTP, logic bisnis, dan akses database:
 
 1. **Entry Point (`src/index.ts` & `index.ts`)**
-   - Menginisialisasi aplikasi `Elysia`, mendaftarkan global error handler (`.onError({ as: "global" }, ...)`), memasang route plugin (`userRoutes`), menyediakan endpoint sistem (`/` dan `/health`), serta menjalankan HTTP server.
+   - Menginisialisasi aplikasi `Elysia`, mendaftarkan global error handler (`.onError({ as: "global" }, ...)`), memasang dokumentasi OpenAPI / Swagger UI, memasang route plugin (`userRoutes`), menyediakan endpoint sistem (`/` dan `/health`), serta menjalankan HTTP server.
    - Global error handler memastikan error validasi (`422`), route tidak ditemukan (`404`), dan error internal server (`500`) tertangani seragam tanpa membocorkan query SQL mentah ke client.
 2. **Routes Layer (`src/routes/`)**
-   - Bertanggung jawab atas routing HTTP, validasi payload (`t.Object`), ekstraksi token Bearer via helper `extractBearerToken` (mendukung skema `Bearer` secara *case-insensitive*), pemanggilan service, dan pemetaan hasil/error menjadi status HTTP & JSON response.
+   - Bertanggung jawab atas routing HTTP, validasi payload (`t.Object`), metadata OpenAPI (detail tag, summary, description, response schema, dan security), ekstraksi token Bearer via helper `extractBearerToken` (mendukung skema `Bearer` secara *case-insensitive*), pemanggilan service, dan pemetaan hasil/error menjadi status HTTP & JSON response.
 3. **Services Layer (`src/services/`)**
    - Menyimpan seluruh logic bisnis aplikasi (pengecekan email duplikat, hashing/verifikasi password, pembuatan/penghapusan session, dan query relasi user–session) serta mendefinisikan custom domain error (`UserAlreadyExistsError`, `InvalidCredentialsError`, `UnauthorizedError`).
 4. **Database Layer (`src/db/`)**
@@ -68,7 +72,7 @@ Aplikasi ini menerapkan arsitektur berlapis (*layered architecture*) untuk memis
 ### Konvensi Penamaan File
 - **Routes:** `src/routes/<domain>-routes.ts` (contoh: `user-routes.ts`)
 - **Services:** `src/services/<domain>-services.ts` (contoh: `user-services.ts`)
-- **Tests:** `tests/<fitur>.test.ts` (contoh: `register.test.ts`, `login.test.ts`, `current-user.test.ts`, `logout.test.ts`, `system.test.ts`)
+- **Tests:** `tests/<fitur>.test.ts` (contoh: `register.test.ts`, `login.test.ts`, `current-user.test.ts`, `logout.test.ts`, `swagger.test.ts`, `system.test.ts`)
 
 ### Struktur Direktori
 ```text
@@ -86,10 +90,11 @@ Aplikasi ini menerapkan arsitektur berlapis (*layered architecture*) untuk memis
 │   │   └── user-routes.ts          # Routing API /api/users/* & helper extractBearerToken
 │   ├── services/
 │   │   └── user-services.ts        # Logic bisnis registrasi, login, current user, & logout
-│   └── index.ts                    # Inisialisasi server Elysia, global error handler, & health check
+│   └── index.ts                    # Inisialisasi server Elysia, Swagger setup, global error handler, & health check
 ├── tests/
 │   ├── test-utils.ts               # Helper cleanDatabase() untuk reset tabel sebelum tiap skenario
 │   ├── system.test.ts              # Test endpoint GET /, GET /health, dan 404
+│   ├── swagger.test.ts             # Test endpoint GET /swagger & /swagger/json
 │   ├── register.test.ts            # Test endpoint POST /api/users
 │   ├── login.test.ts               # Test endpoint POST /api/users/login
 │   ├── current-user.test.ts        # Test endpoint GET /api/users/current & extractBearerToken
@@ -128,9 +133,36 @@ Skema didefinisikan pada `src/db/schema.ts` untuk database MySQL dengan relasi *
 
 ---
 
+## Dokumentasi API Interaktif (Swagger UI)
+
+Aplikasi ini dilengkapi dengan antarmuka dokumentasi API interaktif berbasis Swagger UI:
+- **Swagger UI:** [http://localhost:3000/swagger](http://localhost:3000/swagger)
+- **OpenAPI JSON Spec:** [http://localhost:3000/swagger/json](http://localhost:3000/swagger/json)
+
+### Cara Menguji API Melalui Swagger UI:
+1. Jalankan server (`bun run dev`).
+2. Buka `http://localhost:3000/swagger` pada browser.
+3. Gunakan endpoint `POST /api/users` untuk registrasi user baru.
+4. Gunakan endpoint `POST /api/users/login` untuk login dan salin token UUID dari response body (`data`).
+5. Klik tombol **Authorize** (ikon gembok) di pojok kanan atas Swagger UI, masukkan token sesi ke kolom value, lalu klik **Authorize**.
+6. Sekarang Anda dapat langsung menguji endpoint terproteksi seperti `GET /api/users/current` dan `DELETE /api/users/logout` langsung dari antarmuka browser.
+
+---
+
 ## API yang Tersedia
 
 Base URL default: `http://localhost:3000`
+
+| Method | Endpoint | Auth | Deskripsi |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/` | Tidak | Status aplikasi dan waktu server |
+| `GET` | `/health` | Tidak | Health check koneksi database MySQL & uptime |
+| `GET` | `/swagger` | Tidak | Antarmuka interaktif Swagger UI |
+| `GET` | `/swagger/json` | Tidak | Spesifikasi OpenAPI 3.0 dalam format JSON |
+| `POST` | `/api/users` | Tidak | Registrasi akun pengguna baru |
+| `POST` | `/api/users/login` | Tidak | Login akun dan membuat session token |
+| `GET` | `/api/users/current` | Bearer Token | Mengambil data profil pengguna yang sedang login |
+| `DELETE` | `/api/users/logout` | Bearer Token | Menghapus session token yang aktif (logout) |
 
 ### 1. Info Aplikasi — `GET /`
 Mengembalikan informasi dasar dan status aplikasi.
@@ -333,7 +365,7 @@ Server akan berjalan pada `http://localhost:3000` (atau sesuai nilai `PORT` di `
    ```
 2. **Menjalankan file test tertentu:**
    ```bash
-   bun test tests/register.test.ts
+   bun test tests/swagger.test.ts
    ```
 3. **Menjalankan TypeScript type checking:**
    ```bash

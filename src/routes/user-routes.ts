@@ -38,6 +38,12 @@ export const userRoutes = new Elysia()
       }
     },
     {
+      detail: {
+        tags: ["Users"],
+        summary: "Registrasi User Baru",
+        description:
+          "Mendaftarkan user baru dengan nama, email unik, dan password yang di-hash menggunakan bcrypt.",
+      },
       body: t.Object({
         name: t.String({ minLength: 1, maxLength: 255 }),
         email: t.String({
@@ -48,6 +54,19 @@ export const userRoutes = new Elysia()
         }),
         password: t.String({ minLength: 1, maxLength: 255 }),
       }),
+      response: {
+        201: t.Object({
+          data: t.Literal("OK"),
+        }),
+        400: t.Object({
+          error: t.String(),
+        }),
+        422: t.Object({
+          success: t.Boolean(),
+          code: t.String(),
+          message: t.String(),
+        }),
+      },
     }
   )
   .post(
@@ -70,6 +89,12 @@ export const userRoutes = new Elysia()
       }
     },
     {
+      detail: {
+        tags: ["Users"],
+        summary: "Login User",
+        description:
+          "Melakukan otentikasi menggunakan email dan password, mengembalikan token sesi UUID.",
+      },
       body: t.Object({
         email: t.String({
           minLength: 3,
@@ -79,55 +104,112 @@ export const userRoutes = new Elysia()
         }),
         password: t.String({ minLength: 1, maxLength: 255 }),
       }),
+      response: {
+        200: t.Object({
+          data: t.String(),
+        }),
+        401: t.Object({
+          error: t.String(),
+        }),
+        422: t.Object({
+          success: t.Boolean(),
+          code: t.String(),
+          message: t.String(),
+        }),
+      },
     }
   )
-  .get("/api/users/current", async ({ headers, set }) => {
-    const token = extractBearerToken(headers.authorization);
-    if (!token) {
-      set.status = 401;
-      return {
-        error: "Unauthorized",
-      };
-    }
-
-    try {
-      const user = await getCurrentUser(token);
-      set.status = 200;
-      return {
-        data: user,
-      };
-    } catch (error) {
-      if (error instanceof UnauthorizedError) {
+  .get(
+    "/api/users/current",
+    async ({ headers, set }) => {
+      const token = extractBearerToken(headers.authorization);
+      if (!token) {
         set.status = 401;
         return {
-          error: error.message,
+          error: "Unauthorized",
         };
       }
-      throw error;
-    }
-  })
-  .delete("/api/users/logout", async ({ headers, set }) => {
-    const token = extractBearerToken(headers.authorization);
-    if (!token) {
-      set.status = 401;
-      return {
-        error: "Unauthorized",
-      };
-    }
 
-    try {
-      await logoutUser(token);
-      set.status = 200;
-      return {
-        data: "OK",
-      };
-    } catch (error) {
-      if (error instanceof UnauthorizedError) {
+      try {
+        const user = await getCurrentUser(token);
+        set.status = 200;
+        return {
+          data: user,
+        };
+      } catch (error) {
+        if (error instanceof UnauthorizedError) {
+          set.status = 401;
+          return {
+            error: error.message,
+          };
+        }
+        throw error;
+      }
+    },
+    {
+      detail: {
+        tags: ["Users"],
+        summary: "Dapatkan Data User yang Sedang Login",
+        description:
+          "Mengembalikan data user saat ini berdasarkan Bearer token sesi yang valid di header Authorization.",
+        security: [{ bearerAuth: [] }],
+      },
+      response: {
+        200: t.Object({
+          data: t.Object({
+            id: t.Number(),
+            name: t.String(),
+            email: t.String(),
+          }),
+        }),
+        401: t.Object({
+          error: t.String(),
+        }),
+      },
+    }
+  )
+  .delete(
+    "/api/users/logout",
+    async ({ headers, set }) => {
+      const token = extractBearerToken(headers.authorization);
+      if (!token) {
         set.status = 401;
         return {
-          error: error.message,
+          error: "Unauthorized",
         };
       }
-      throw error;
+
+      try {
+        await logoutUser(token);
+        set.status = 200;
+        return {
+          data: "OK",
+        };
+      } catch (error) {
+        if (error instanceof UnauthorizedError) {
+          set.status = 401;
+          return {
+            error: error.message,
+          };
+        }
+        throw error;
+      }
+    },
+    {
+      detail: {
+        tags: ["Users"],
+        summary: "Logout User",
+        description:
+          "Menghapus sesi user saat ini berdasarkan Bearer token di header Authorization.",
+        security: [{ bearerAuth: [] }],
+      },
+      response: {
+        200: t.Object({
+          data: t.Literal("OK"),
+        }),
+        401: t.Object({
+          error: t.String(),
+        }),
+      },
     }
-  });
+  );
