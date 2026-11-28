@@ -40,6 +40,13 @@ export interface CurrentUser {
   email: string;
 }
 
+/**
+ * Mendaftarkan user baru ke sistem.
+ * Memeriksa apakah email sudah terdaftar, meng-hash password menggunakan bcrypt,
+ * lalu menyimpan data user baru ke tabel `users`.
+ *
+ * @throws {UserAlreadyExistsError} Jika email sudah terdaftar di database.
+ */
 export const registerUser = async (input: RegisterUserInput) => {
   const existing = await db
     .select({ id: users.id })
@@ -65,6 +72,12 @@ export const registerUser = async (input: RegisterUserInput) => {
   return { success: true };
 };
 
+/**
+ * Memproses login user dengan memverifikasi email dan kecocokan password bcrypt.
+ * Jika valid, membuat token session UUID baru dan menyimpannya ke tabel `sessions`.
+ *
+ * @throws {InvalidCredentialsError} Jika email tidak ditemukan atau password salah.
+ */
 export const loginUser = async (input: LoginUserInput) => {
   const [user] = await db
     .select({
@@ -98,6 +111,12 @@ export const loginUser = async (input: LoginUserInput) => {
   return { token };
 };
 
+/**
+ * Mengambil data profil user yang sedang login (`id`, `name`, `email`) berdasarkan token session.
+ * Melakukan join antara tabel `sessions` dan `users` tanpa mengembalikan field sensitif.
+ *
+ * @throws {UnauthorizedError} Jika token kosong atau session tidak ditemukan.
+ */
 export const getCurrentUser = async (token: string): Promise<CurrentUser> => {
   const trimmedToken = token ? token.trim() : "";
   if (!trimmedToken) {
@@ -122,6 +141,12 @@ export const getCurrentUser = async (token: string): Promise<CurrentUser> => {
   return result;
 };
 
+/**
+ * Melakukan logout user dengan menghapus data session terkait dari tabel `sessions`.
+ * Menggunakan single query delete yang atomik untuk memastikan token langsung tidak berlaku.
+ *
+ * @throws {UnauthorizedError} Jika token kosong atau session tidak ditemukan.
+ */
 export const logoutUser = async (token: string): Promise<void> => {
   const trimmedToken = token ? token.trim() : "";
   if (!trimmedToken) {
