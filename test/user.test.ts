@@ -91,6 +91,122 @@ describe("User Registration Endpoint (POST /api/users)", () => {
     const isMatch = await Bun.password.verify(plainPassword, hashedPassword);
     expect(isMatch).toBe(true);
   });
+
+  it("Rejects name longer than 255 characters with status 422", async () => {
+    const spy = spyOn(userServices, "registerUser");
+    const response = await app.handle(
+      new Request("http://localhost:3000/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "a".repeat(300),
+          email: "test300@localhost",
+          password: "rahasia",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(422);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("Accepts name with exactly 255 characters", async () => {
+    const spy = spyOn(userServices, "registerUser").mockResolvedValue({
+      success: true,
+    });
+
+    try {
+      const exact255 = "a".repeat(255);
+      const response = await app.handle(
+        new Request("http://localhost:3000/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: exact255,
+            email: "test255@localhost",
+            password: "rahasia",
+          }),
+        })
+      );
+
+      expect(response.status).toBe(201);
+      const json = (await response.json()) as Record<string, any>;
+      expect(json.data).toBe("OK");
+      expect(spy).toHaveBeenCalledWith({
+        name: exact255,
+        email: "test255@localhost",
+        password: "rahasia",
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("Rejects email longer than 255 characters with status 422", async () => {
+    const longEmail = "a".repeat(250) + "@localhost";
+    const response = await app.handle(
+      new Request("http://localhost:3000/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Ben",
+          email: longEmail,
+          password: "rahasia",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(422);
+  });
+
+  it("Rejects password longer than 255 characters with status 422", async () => {
+    const response = await app.handle(
+      new Request("http://localhost:3000/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Ben",
+          email: "ben@localhost",
+          password: "p".repeat(256),
+        }),
+      })
+    );
+
+    expect(response.status).toBe(422);
+  });
+
+  it("Masks internal server error and does not leak raw SQL query", async () => {
+    const spy = spyOn(userServices, "registerUser").mockRejectedValue(
+      new Error(
+        "Failed query: select `id` from `users` where `users`.`email` = ? limit ? params: leak@localhost,1"
+      )
+    );
+
+    try {
+      const response = await app.handle(
+        new Request("http://localhost:3000/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: "Ben",
+            email: "ben@localhost",
+            password: "rahasia",
+          }),
+        })
+      );
+
+      expect(response.status).toBe(500);
+      const json = (await response.json()) as Record<string, any>;
+      expect(json.success).toBe(false);
+      expect(json.code).toBe("INTERNAL_SERVER_ERROR");
+      expect(json.message).toBe("Internal Server Error");
+      expect(JSON.stringify(json)).not.toContain("Failed query");
+      expect(JSON.stringify(json)).not.toContain("select");
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 describe("User Login Endpoint (POST /api/users/login)", () => {
@@ -169,6 +285,21 @@ describe("User Login Endpoint (POST /api/users/login)", () => {
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     expect(uuidRegex.test(token)).toBe(true);
+  });
+
+  it("Rejects email or password longer than 255 characters with status 422", async () => {
+    const response = await app.handle(
+      new Request("http://localhost:3000/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "a".repeat(250) + "@localhost",
+          password: "rahasia",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(422);
   });
 });
 

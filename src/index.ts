@@ -5,6 +5,33 @@ import { userRoutes } from "./routes/user-routes";
 const port = Number(process.env.PORT) || 3000;
 
 export const app = new Elysia()
+  .onError({ as: "global" }, ({ code, error, set }) => {
+    if (code === "VALIDATION") {
+      set.status = 422;
+      return {
+        success: false,
+        code,
+        message: "message" in error ? (error as Error).message : "Validation error",
+      };
+    }
+
+    if (code === "NOT_FOUND") {
+      set.status = 404;
+      return {
+        success: false,
+        code,
+        message: "Not Found",
+      };
+    }
+
+    console.error("Internal Server Error:", error);
+    set.status = 500;
+    return {
+      success: false,
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal Server Error",
+    };
+  })
   .use(userRoutes)
   .get("/", () => ({
     name: "belajar-vibe-coding API",
@@ -29,13 +56,6 @@ export const app = new Elysia()
         timestamp: new Date().toISOString(),
       };
     }
-  })
-  .onError(({ code, error, set }) => {
-    return {
-      success: false,
-      code,
-      message: "message" in error ? (error as Error).message : String(error),
-    };
   });
 
 export const startServer = () => {
