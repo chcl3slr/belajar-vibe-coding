@@ -16,8 +16,7 @@ Proyek backend menggunakan **Bun**, **ElysiaJS**, **Drizzle ORM**, dan **MySQL**
 │   │   ├── index.ts     # Inisialisasi pool MySQL dan instance Drizzle
 │   │   └── schema.ts    # Definisi skema tabel database
 │   └── index.ts         # Server Elysia, routing, & error handling
-├── test/
-│   └── index.test.ts    # Unit & integration tests
+├── tests/            # Unit & integration test suite (bun test)
 ├── drizzle/             # File migrasi SQL hasil generate Drizzle
 ├── drizzle.config.ts    # Konfigurasi Drizzle Kit untuk MySQL
 ├── index.ts             # Entrypoint root
